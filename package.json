@@ -1,0 +1,16 @@
+{
+  "name": "netchat",
+  "version": "1.0.0",
+  "description": "cli tcp chat application",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"haha\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "ansi-color": "^0.2.1",
+    "redis": "^2.6.2"
+  }
+}
