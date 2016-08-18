@@ -18,14 +18,14 @@ module.exports = (function() {
       }
     }
   }
-  
+
   function isUnique(client) {
-    return !existsClient(client, 'name')
+    return !existsClient(client, 'nick')
   }
 
   function add(client) {
     if(isUnique(client)) {
-     clients.push(client) 
+      clients.push(client)
     } else {
       throw new Error('user name exists')
     }
@@ -33,17 +33,17 @@ module.exports = (function() {
   }
 
   function fetch(client) {
-    if(client && existsClient(client, 'name')) {
-      return find(clients, (_client) => _client.name == client.name)
+    if(client && existsClient(client, 'nick')) {
+      return find(clients, (_client) => _client.nick == client.nick)
     }
     return clients;
   }
 
   function remove(client) {
-    if(client && existsClient(client, 'name')) {
-      clients = clients.filter(_client => _client.name != client.name)
+    if(client && existsClient(client, 'nick')) {
+      clients = clients.filter(_client => _client.nick != client.nick)
     }
-    return this  
+    return this
   }
   return {
     isUnique: isUnique,

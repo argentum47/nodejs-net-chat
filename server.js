@@ -8,7 +8,7 @@ let clients = clientDb.get()
 let server = net.createServer(function(socket) {
   socket.name = socket.remoteAddress + ":" + socket.remotePort
 
-  socket.on('data', onReceiveData(socket)) 
+  socket.on('data', onReceiveData(socket))
   socket.on('error', onError(socket))
   socket.on('end', onEnd(socket))
 })
@@ -20,27 +20,27 @@ server.listen(process.env.PORT || 5000, '127.0.0.1', () => {
 module.exports = server
 
 function welcomeMessage(socket) {
-  socket.write(JSON.stringify({message: `Welcome ${socket.nick}`}))
-  broadCastToChannel(JSON.stringify({message:`${socket.nick} joined chat`}), filterClients(clients, socket))
+  broadCastToUser(socket, JSON.stringify({message: `Welcome ${socket.nick}`, type: 'me' }))
+  broadCastToChannel(`${socket.nick} joined chat`, filterClients(clients, socket), 'broadcast')
 }
 
 function onReceiveData(socket) {
   return (data) => {
-    data = JSON.parse(data)
+    let _data = JSON.parse(data)
     let message;
 
-    if(data.type == 'name') {
+    if(_data.type == 'name') {
+        socket.nick = _data.name
       if(clientDb.isUnique(socket)) {
         clients = clientDb.create(socket).get()
-        socket.nick = data.name
-        return welcomeMessage(socket, data)
+        return welcomeMessage(socket)
       } else {
-        socket.write('User name exists, Reconnect and choose another')
-        return socket.disconnect()
+        broadCastToUser(socket, JSON.stringify({message: 'User name exists, Reconnect and choose another', type: 'me'}))
+        return socket.destroy()
       }
-    } else if(data.type == 'message'){
-      broadCastToChannel(data, filterClients(clients, socket))
-      console.log(JSON.parse(data.message).message)
+    } else if(_data.type == 'message'){
+      broadCastToChannel(_data.message, filterClients(clients, socket), 'chat', socket.nick)
+      console.log(_data)
     }
   }
 }
@@ -54,17 +54,25 @@ function onError(socket) {
 function onEnd(socket) {
   return () => {
     clients = filterClients(clientDb.remove(socket).get(), socket)
-    broadCastToChannel(`${socket.name} left channel`, clients)
+    broadCastToChannel(`${socket.nick} left channel`, clients, 'broadcast')
   }
 }
 
 function filterClients(clients, sender) {
   return clients.filter(_client => _client != sender)
-} 
+}
 
-function broadCastToChannel(message, clients) {
+function parseMessage(message) {
+
+}
+
+function broadCastToUser(client, message) {
+  client.write(message)
+}
+
+function broadCastToChannel(message, clients, type, from) {
   clients.forEach(_client => {
-    _client.write(message)  
+    broadCastToUser(_client, JSON.stringify({message: message, type: type, from: from }))
   })
 }
 
