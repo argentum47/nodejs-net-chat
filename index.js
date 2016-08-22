@@ -1,42 +1,55 @@
 'use strict'
 
 const readline = require('readline')
-const listOfPeers = require('./scan')
+const net = require('net')
+const scanner = require('./scan')
+const dB = require('./old/clientDb')
 const initializeServer = require('./server')
 const initializeClient = require('./client')
-
+const wrapEvent = require('./wrapEvent')
+const MAX_ATTEMPTS = 5
 const PORT = 5000
+
+let listOfPeers = []
 let attemptsCount = 0
-let server = initializeUDPServer()
-let client = initializeUDPClient()
+let clientSocket, serverSocket, nick;
 
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout
 })
 
-function bootStrap() {
-  showListofPeers()
+rl.on('line', (line) => {
+})
 
-  rl.question('enter a name', (name) => {
-    attemptsCount += 1
-
-    if(isUnique(name)) {
-      server.name = name
-      listenOnServer()
-      broadcastToPeers()
-
-      rl.prompt(true)
-    } else if(attemptsCount > 4) {
-      maximumRetriesFailed()
-      process.exit(1)
-    } else bootStrap()
-  })
+function bootStrap() { 
+  return initializeServer(PORT).then(socket => {
+    clientSocket = socket
+    
+    return wrapEvent(socket, 'data')
+  }).then((data) => {
+      let message = parseAndEval(data, { ip: socket.remoteAddress })
+      socket.write(JSON.stringify(message))
+   }).catch(e => console.log(e))
 }
 
-rl.on('line', (line) => {
-  sendMessage(line)
-})
+function parseAndEval(_data, extra) {
+  let data = JSON.parse(_data.toString('utf8'));
+  let message = {}
+
+  if(data.type == 'ping') {
+    message = Object.create({}, message, extra, { type: 'pong', text: nick })
+  }
+
+  return message
+}
+
+function checkAttempCount(count) {
+  if(count > MAX_ATTEMPTS) {
+    console.log("Maximum number of retries failed")
+    return true
+  }
+}
 
 function showListofPeers() {
   listOfPeers.forEach(peer => {
@@ -44,15 +57,16 @@ function showListofPeers() {
   })
 }
 
-function listenOnServer() {
-  server.on('listening', () => {
-    console.log('...')
-  })
+rl.question('Enter a nick name ', (name) => {
+  nick = name;
 
-  server.on('message', (msg, rinfo) => {
-    console.log(msg, rinfo)
-  })
+  return bootStrap().then(() => {
+    console.log('here')
+    return scanner()
+  }).then(data => { 
+    listOfPeers = dB.get()
+    showListofPeers()
+    rl.prompt(true)
+ })
+})
 
-  server.bind(PORT)
-}
-bootStrap()
