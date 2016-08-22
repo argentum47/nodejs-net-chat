@@ -4,11 +4,9 @@ const readline = require('readline')
 const net = require('net')
 const scanner = require('./scan')
 const dB = require('./old/clientDb')
-const initializeServer = require('./server')
-const initializeClient = require('./client')
 const wrapEvent = require('./wrapEvent')
 const MAX_ATTEMPTS = 5
-const PORT = 5000
+const PORT = 5002
 
 let listOfPeers = []
 let attemptsCount = 0
@@ -22,15 +20,24 @@ const rl = readline.createInterface({
 rl.on('line', (line) => {
 })
 
-function bootStrap() { 
-  return initializeServer(PORT).then(socket => {
-    clientSocket = socket
-    
-    return wrapEvent(socket, 'data')
-  }).then((data) => {
-      let message = parseAndEval(data, { ip: socket.remoteAddress })
+function initializeServer() {
+  return net.createServer()
+}
+
+function bootStrap(cb) { 
+  let server = net.createServer();
+ 
+  server.listen(PORT, () => {
+    console.log('listening')
+    cb()
+  })
+
+  server.on('connection', (socket) => {
+    socket.on('data', (data) => {  
+      let message = parseAndEval(data, { ip: clientSocket.remoteAddress });
       socket.write(JSON.stringify(message))
-   }).catch(e => console.log(e))
+    })
+  })
 }
 
 function parseAndEval(_data, extra) {
@@ -60,13 +67,13 @@ function showListofPeers() {
 rl.question('Enter a nick name ', (name) => {
   nick = name;
 
-  return bootStrap().then(() => {
+  bootStrap(() => {
     console.log('here')
-    return scanner()
-  }).then(data => { 
-    listOfPeers = dB.get()
-    showListofPeers()
-    rl.prompt(true)
- })
+    scanner().then(data => {
+      listOfPeers = dB.get()
+      showListofPeers()
+      rl.prompt(true)
+    })
+  })
 })
 
