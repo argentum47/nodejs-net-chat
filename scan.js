@@ -30,23 +30,23 @@ function connectToSocket(ip) {
     
     socket.setTimeout(2000, () => { destroy(socket, resolve) })
     socket.connect(PORT, ip, () => {
-      socket.write(JSON.stringify({ type: 'ping' }))
+      if(socket.localAddress != ip) socket.write(JSON.stringify({ type: 'ping' }))
+      else destroy(socket, resolve)
     })
     socket.on('data', (data) => {
       data = data ? data.toString('utf8') : "{}"
-      
+
       try {
         let jd = JSON.parse(data)
 
-        console.log(jd)
-
         if(jd.type == 'pong') {
-          socket.nick = jd.nick
+          socket.nick = jd.text
           dB.create(socket)
         }
       } catch(e) { }
        destroy(socket, resolve)
     })
+
     socket.on('error', () => {
       destroy(socket, resolve)
     })

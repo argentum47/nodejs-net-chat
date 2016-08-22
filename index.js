@@ -10,7 +10,7 @@ const PORT = 5000
 
 let listOfPeers = []
 let attemptsCount = 0
-let clientSocket, serverSocket, nick;
+let socket, client;
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -18,11 +18,84 @@ const rl = readline.createInterface({
 })
 
 rl.on('line', (line) => {
+  if(line.startsWith('!!')) {
+    let message = executeCommand(line.slice(2))
+    if(message) console.log(message)
+
+  } else if(client && client.remoteAddress) {
+    client.write(JSON.stringify({ type: 'message', text: line }))
+  }
+
+  rl.prompt()
 })
 
-function initializeServer() {
-  return net.createServer()
+function executeCommand(_data) {
+  let [command, ...value] = _data.split(" ")
+  
+  return Commander.execute(command, value.join(" "))
 }
+
+let Commander = (function(){
+  let dispatchTable = {};
+
+  function register(command, helpText, action) {
+    dispatchTable[command] = { name: command, text: helpText, action: action }
+  }
+
+  function execute(command, value) {
+    if(dispatchTable[command]) {
+      return dispatchTable[command].action(value)
+    } else {
+      return "!!rtfm"
+    }
+  }
+
+  function generateDocs() {
+    return Object.keys(dispatchTable).reduce((acc, v) => {
+      let text = dispatchTable[v].text || "meh"
+
+      acc += `-${dispatchTable[v].name} ${text}` + "\n"
+      return acc
+    }, "Command guide for Bot, All bot commands start with a !!\n")
+  }
+
+  // exposed for API only
+  return {
+    register: register,
+    execute: execute,
+    guide: generateDocs
+  }
+})()
+
+
+// generate default commands
+function rtfm() {
+  return Commander.guide()
+}
+
+function connect(clientIp) {
+  client = net.createConnection({ port: PORT, address: clientIp}, () => {
+    console.log('connected')
+    rl.prompt()
+  })
+
+  client.on('data', (data) => {
+    console.log(data.toString('utf8'), 'client')
+  })
+
+  client.on('error', () => {
+    console.log('cannot reach client, check ip')
+  })
+}
+
+function leave(_client) {
+  _client.destroy()
+}
+
+Commander.register('rtfm', 'View available commands', rtfm)
+Commander.register('connect', '<remote ip> To connect to a client', connect)
+Commander.register('leave', 'the current conversation', leave)
+
 
 function bootStrap(cb) { 
   let server = net.createServer();
@@ -32,9 +105,10 @@ function bootStrap(cb) {
     cb()
   })
 
-  server.on('connection', (socket) => {
-    socket.on('data', (data) => {  
-      let message = parseAndEval(data, { ip: clientSocket.remoteAddress });
+  server.on('connection', (_socket) => {
+    socket = _socket
+    socket.on('data', (data) => {
+      let message = parseAndEval(data, { ip: socket.remoteAddress });
       socket.write(JSON.stringify(message))
     })
   })
@@ -45,7 +119,9 @@ function parseAndEval(_data, extra) {
   let message = {}
 
   if(data.type == 'ping') {
-    message = Object.create({}, message, extra, { type: 'pong', text: nick })
+    message = Object.assign({}, message, extra, { type: 'pong', text: nick })
+  } if(data.type == 'message') {
+    return Object.assign({}, message, { text: data.text })
   }
 
   return message
@@ -60,9 +136,11 @@ function checkAttempCount(count) {
 
 function showListofPeers() {
   listOfPeers.forEach(peer => {
-    console.log(peer.name)
+    console.log(peer.nick, peer.remoteAddress)
   })
 }
+
+let nick;
 
 rl.question('Enter a nick name ', (name) => {
   nick = name;
