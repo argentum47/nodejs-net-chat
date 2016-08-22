@@ -6,7 +6,7 @@ const scanner = require('./scan')
 const dB = require('./old/clientDb')
 const wrapEvent = require('./wrapEvent')
 const MAX_ATTEMPTS = 5
-const PORT = 5002
+const PORT = 5000
 
 let listOfPeers = []
 let attemptsCount = 0

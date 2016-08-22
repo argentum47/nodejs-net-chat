@@ -2,7 +2,7 @@
 
 const net = require('net')
 const dB = require('./old/clientDb')
-const leaderIp = '192.168.1'
+const leaderIp = '192.168.43'
 const PORT = 5000
 let count = 0;
 
@@ -30,7 +30,6 @@ function connectToSocket(ip) {
     
     socket.setTimeout(2000, () => { destroy(socket, resolve) })
     socket.connect(PORT, ip, () => {
-      console.log('connected', ip)
       socket.write(JSON.stringify({ type: 'ping' }))
     })
     socket.on('data', (data) => {
