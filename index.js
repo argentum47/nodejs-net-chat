@@ -117,7 +117,7 @@ function checkAttempCount(count) {
 
 function showListofPeers() {
   listOfPeers.forEach(peer => {
-    console.log(peer.nick, peer.remoteAddress)
+    console.log(peer.nick, peer.ip)
   })
 }
 
@@ -127,12 +127,12 @@ rl.question('Enter a nick name ', (name) => {
   nick = name;
 
   bootStrap(() => {
-    console.log('here')
     scanner().then(data => {
-      listOfPeers = dB.get()
+      console.log('then')
+      listOfPeers = dB.all()
       showListofPeers()
       rl.prompt(true)
-    })
+    }).catch(e => console.log(e, 'err'))
   })
 })
 

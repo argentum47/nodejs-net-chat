@@ -5,6 +5,7 @@ function Node(key, value, left, right) {
   this.value = value
   this.left = null
   this.right = null
+  this.show = () => this.value
 }
 
 module.exports = function BSTree() {
@@ -67,12 +68,12 @@ function find(data) {
 }
 
 function inOrder() {
-  let data = []
+  let data = [];
 
   (function traverse(node) {
-    if(!node) {
+    if(node) {
       traverse(node.left)
-      data = data.concat({ [node.key]: node.value })
+      data = data.concat(node.show())
       traverse(node.right)
     }
   })(this.root)

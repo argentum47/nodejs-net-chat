@@ -42,7 +42,9 @@ function connectToSocket(ip) {
         if(jd.type == 'pong') {
           dB.add({ ip: ip, nick: jd.text, socket: socket })
         }
-      } catch(e) { }
+      } catch(e) { 
+        console.log(e)
+      }
        destroy(socket, resolve)
     })
 
