@@ -61,7 +61,7 @@ function connect(clientIp) {
   let data = dB.find(clientIp)
 
   if(data) {
-    client = net.createConnect({ port: PORT, address: clientIp }, () => {
+    client = net.createConnection({ port: PORT, address: clientIp }, () => {
       console.log('connected')
       rl.prompt()
     }) 
@@ -128,7 +128,6 @@ rl.question('Enter a nick name ', (name) => {
 
   bootStrap(() => {
     scanner().then(data => {
-      console.log('then')
       listOfPeers = dB.all()
       showListofPeers()
       rl.prompt(true)
