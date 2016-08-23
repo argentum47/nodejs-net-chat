@@ -1,8 +1,8 @@
 'use strict'
 
 const net = require('net')
-const dB = require('./old/clientDb')
-const leaderIp = '192.168.43'
+const dB = require('./ipDb')
+const leaderIp = '192.168.1'
 const PORT = 5000
 let count = 0;
 
@@ -40,8 +40,7 @@ function connectToSocket(ip) {
         let jd = JSON.parse(data)
 
         if(jd.type == 'pong') {
-          socket.nick = jd.text
-          dB.create(socket)
+          dB.add({ ip: ip, nick: jd.text, socket: socket })
         }
       } catch(e) { }
        destroy(socket, resolve)

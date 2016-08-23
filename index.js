@@ -3,8 +3,9 @@
 const readline = require('readline')
 const net = require('net')
 const scanner = require('./scan')
-const dB = require('./old/clientDb')
+const dB = require('./ipDb')
 const wrapEvent = require('./wrapEvent')
+const Commander = require('./commander')
 const MAX_ATTEMPTS = 5
 const PORT = 5000
 
@@ -35,47 +36,16 @@ function executeCommand(_data) {
   return Commander.execute(command, value.join(" "))
 }
 
-let Commander = (function(){
-  let dispatchTable = {};
-
-  function register(command, helpText, action) {
-    dispatchTable[command] = { name: command, text: helpText, action: action }
-  }
-
-  function execute(command, value) {
-    if(dispatchTable[command]) {
-      return dispatchTable[command].action(value)
-    } else {
-      return "!!rtfm"
-    }
-  }
-
-  function generateDocs() {
-    return Object.keys(dispatchTable).reduce((acc, v) => {
-      let text = dispatchTable[v].text || "meh"
-
-      acc += `-${dispatchTable[v].name} ${text}` + "\n"
-      return acc
-    }, "Command guide for Bot, All bot commands start with a !!\n")
-  }
-
-  // exposed for API only
-  return {
-    register: register,
-    execute: execute,
-    guide: generateDocs
-  }
-})()
-
-
 // generate default commands
 function rtfm() {
   return Commander.guide()
 }
 
+
 function connect(clientIp) {
+  /*
   client = net.createConnection({ port: PORT, address: clientIp}, () => {
-    console.log('connected')
+    console.log('connected')    
     rl.prompt()
   })
 
@@ -86,7 +56,18 @@ function connect(clientIp) {
   client.on('error', () => {
     console.log('cannot reach client, check ip')
   })
+  */
+  
+  let data = dB.find(clientIp)
+
+  if(data) {
+    client = net.createConnect({ port: PORT, address: clientIp }, () => {
+      console.log('connected')
+      rl.prompt()
+    }) 
+  }
 }
+
 
 function leave(_client) {
   _client.destroy()
