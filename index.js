@@ -6,12 +6,13 @@ const scanner = require('./scan')
 const dB = require('./ipDb')
 const wrapEvent = require('./wrapEvent')
 const Commander = require('./commander')
+const makeColor = require('./color').make
+const color = require('./color').paint
+const cconsole = require('./cconsole')
 const MAX_ATTEMPTS = 5
 const PORT = 5000
 
-let listOfPeers = []
-let attemptsCount = 0
-let socket, client;
+let nick, attemptsCount = 0, listOfPeers = [], socket, client;
 
 const rl = readline.createInterface({
   input: process.stdin,
@@ -23,8 +24,8 @@ rl.on('line', (line) => {
     let message = executeCommand(line.slice(2))
     if(message) console.log(message)
 
-  } else if(client && client.remoteAddress) {
-    client.write(JSON.stringify({ type: 'message', text: line }))
+  } else if(client && !client.destroyed) {
+    client.write(JSON.stringify({ type: 'message', text: line, ip: client.remoteAddress }))
   }
 
   rl.prompt()
@@ -32,7 +33,7 @@ rl.on('line', (line) => {
 
 function executeCommand(_data) {
   let [command, ...value] = _data.split(" ")
-  
+
   return Commander.execute(command, value.join(" "))
 }
 
@@ -43,34 +44,25 @@ function rtfm() {
 
 
 function connect(clientIp) {
-  /*
-  client = net.createConnection({ port: PORT, address: clientIp}, () => {
-    console.log('connected')    
+  let node = dB.find(clientIp)
+
+  client = net.createConnection({ port: PORT, host: clientIp }, () => {
+    console.log('connected to: ', (node ? node.nick : clientIp))
     rl.prompt()
   })
 
-  client.on('data', (data) => {
-    console.log(data.toString('utf8'), 'client')
+  client.on('connect', () => {
+    client.write(JSON.stringify({ type: 'pong', text: nick, ip: clientIp }))
   })
 
-  client.on('error', () => {
-    console.log('cannot reach client, check ip')
+  client.on('destroy', () => {
+    client.wrtie(JSON.stringify({ type: 'destroy', text: nick }))
   })
-  */
-  
-  let data = dB.find(clientIp)
-
-  if(data) {
-    client = net.createConnection({ port: PORT, address: clientIp }, () => {
-      console.log('connected')
-      rl.prompt()
-    }) 
-  }
 }
 
 
-function leave(_client) {
-  _client.destroy()
+function leave() {
+  client.destroy()
 }
 
 Commander.register('rtfm', 'View available commands', rtfm)
@@ -78,9 +70,9 @@ Commander.register('connect', '<remote ip> To connect to a client', connect)
 Commander.register('leave', 'the current conversation', leave)
 
 
-function bootStrap(cb) { 
+function bootStrap(cb) {
   let server = net.createServer();
- 
+
   server.listen(PORT, () => {
     console.log('listening')
     cb()
@@ -89,21 +81,41 @@ function bootStrap(cb) {
   server.on('connection', (_socket) => {
     socket = _socket
     socket.on('data', (data) => {
-      let message = parseAndEval(data, { ip: socket.remoteAddress });
-      socket.write(JSON.stringify(message))
+      let message = parseAndEval(data, { ip: socket.remoteAddress }, socket);
+      if(message) cconsole(message)
+      rl.prompt()
     })
   })
 }
 
-function parseAndEval(_data, extra) {
+function parseAndEval(_data, extra, socket) {
   let data = JSON.parse(_data.toString('utf8'));
-  let message = {}
+  let message = ''
 
-  if(data.type == 'ping') {
-    message = Object.assign({}, message, extra, { type: 'pong', text: nick })
-  } if(data.type == 'message') {
-    return Object.assign({}, message, { text: data.text })
-  }
+  let action = {
+    ping: () => {
+      socket.write(JSON.stringify(Object.assign({}, message, extra, { type: 'pong', text: nick })))
+    },
+
+    pong: () => {
+      dB.add({ip: data.ip, nick: data.text, color: makeColor(data.text) })
+    },
+
+    destroy: () => {
+      message = color(`${data.text} disconnected`, '#ff0000')
+    },
+
+    message: () => {
+      let node = dB.find(data.ip)
+
+      if(!client) connect(data.ip)
+      if(node)    message = color(`<${node.nick}>`, `#${node.color}`)
+
+      message = [message, data.text].join(" ")
+    }
+  }[data.type];
+
+  action()
 
   return message
 }
@@ -121,8 +133,6 @@ function showListofPeers() {
   })
 }
 
-let nick;
-
 rl.question('Enter a nick name ', (name) => {
   nick = name;
 
@@ -134,4 +144,3 @@ rl.question('Enter a nick name ', (name) => {
     }).catch(e => console.log(e, 'err'))
   })
 })
-

@@ -57,6 +57,8 @@ function remove(_id) {
 function find(data) {
   let current = this.root
 
+  if(!this.root) return null
+
   while(current.key != data) {
     if(current.key < data) current = current.right
     else current = current.left
@@ -78,6 +80,5 @@ function inOrder() {
     }
   })(this.root)
 
-  return data  
+  return data
 }
-

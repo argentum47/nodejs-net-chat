@@ -3,9 +3,8 @@
 const net = require('net')
 const dB = require('./ipDb')
 const leaderIp = '192.168.1'
+const makeColor = require('./color').make
 const PORT = 5000
-let count = 0;
-
 
 function destroy(socket, callback, data) {
   socket.destroy();
@@ -40,7 +39,7 @@ function connectToSocket(ip) {
         let jd = JSON.parse(data)
 
         if(jd.type == 'pong') {
-          dB.add({ ip: ip, nick: jd.text, socket: socket })
+          dB.add({ ip: socket.remoteAddress, nick: jd.text, color: makeColor(jd.text) })
         }
       } catch(e) { 
         console.log(e)
