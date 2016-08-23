@@ -4,7 +4,6 @@ const readline = require('readline')
 const net = require('net')
 const scanner = require('./scan')
 const dB = require('./ipDb')
-const wrapEvent = require('./wrapEvent')
 const Commander = require('./commander')
 const makeColor = require('./color').make
 const color = require('./color').paint
