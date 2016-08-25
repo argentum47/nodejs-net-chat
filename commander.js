@@ -30,6 +30,17 @@ let Commander = (function(){
   }
 })()
 
+function help() {
+  return Commander.guide()
+}
 
-module.exports = Commander
+function executeCommand(_data) {
+  let [command, ...value] = _data.split(" ")
 
+  return Commander.execute(command, value.join(" "))
+}
+
+Commander.register('help', 'View available commands', help)
+
+exports.Commander = Commander
+exports.executeCommand = executeCommand

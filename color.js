@@ -1,4 +1,5 @@
 const color = require('ansi-color').set
+const hashCode = require('./utils').hashCode
 
 exports.make = function(str) {
   return intToRGB(Math.abs(hashCode(str)))
@@ -17,19 +18,6 @@ exports.paint = function(text, hex) {
     if(max == B) return color(text, 'cyan')
   }
   return color(text, 'white')
-}
-
-exports.hashCode = hashCode
-
-function hashCode(str) {
-  let hash = 0;
-
-  for (var i = 0; i < str.length; i++) {
-    hash = str.charCodeAt(i) + ((hash << 17) - hash);
-    hash |= 0
-  }
-
-  return hash;
 }
 
 function splitHexToRGB(hex) {

@@ -1,23 +1,23 @@
 'use strict'
 
-const fs = require('fs')
-const readline = require('readline')
 const net = require('net')
+const fs = require('fs')
 const scanner = require('./scan')
-const dB = require('./ipDb')
-const Commander = require('./commander')
+const Commander = require('./commander').Commander
+const executeCommand = require('./commander').executeCommand
 const makeColor = require('./color').make
 const color = require('./color').paint
 const cconsole = require('./cconsole')
+const rl = require('./utils').rl
+const hashCode = require('./utils').hashCode
+const ips = require('./utils').ips
+const showListofPeers = require('./utils').showListofPeers
+const dB = require('./ipDb')
+
 const MAX_ATTEMPTS = 5
 const PORT = 5000
 
 let nick, attemptsCount = 0, listOfPeers = [], socket, client;
-
-const rl = readline.createInterface({
-  input: process.stdin,
-  output: process.stdout
-})
 
 rl.on('line', (line) => {
   if(line.startsWith('!!')) {
@@ -31,17 +31,11 @@ rl.on('line', (line) => {
   rl.prompt()
 })
 
-function executeCommand(_data) {
-  let [command, ...value] = _data.split(" ")
-
-  return Commander.execute(command, value.join(" "))
-}
 
 // generate default commands
 function rtfm() {
   return Commander.guide()
 }
-
 
 function connect(clientIp) {
   let node = dB.find(clientIp)
@@ -64,22 +58,21 @@ function connect(clientIp) {
 
 
 function leave() {
-  client.destroy()
+  if(client) client.destroy()
 }
 
-function scan() {
-  scanner().then(() => {
+function scanAndShow() {
+  return scanner().then(() => {
     listOfPeers = dB.all()
-  
-    showListofPeers()
-    process.exit()
-  })
+
+    showListofPeers(listOfPeers)
+  }).catch(e => console.log(e))
 }
 
 Commander.register('rtfm', 'View available commands', rtfm)
 Commander.register('connect', '<remote ip> To connect to a client', connect)
 Commander.register('leave', 'the current conversation', leave)
-Commander.register('scan', 'rescan the users available online', scan)
+Commander.register('scan', 'rescan the users available online', scanAndShow)
 
 function bootStrap(cb) {
   let server = net.createServer();
@@ -142,21 +135,13 @@ function checkAttempCount(count) {
   }
 }
 
-function showListofPeers() {
-  if(!listOfPeers.length) console.log('no user connected')
-
-  listOfPeers.forEach(peer => {
-    console.log(peer.nick, peer.ip)
-  })
-}
-
 function chooseUserName(user_name) {
   let promise = listOfPeers.length? Promise.resolve(listOfPeers) : scanner().then(() => listOfPeers = dB.all())
-  
+
   return promise.then(() => {
     if(!user_name || listOfPeers.map(peer => peer.nick).includes(user_name)) {
       if(!user_name) console.log('user name ', user_name, ' exists')
-     
+
       if(checkAttempCount(attemptsCount)) { console.log('maximum retries, try again'); process.exit(1) }
 
       rl.question('Choose another ', (name) => {
@@ -170,27 +155,47 @@ function chooseUserName(user_name) {
   }).catch(e => console.log(e))
 }
 
-function setUpConnect(ip) {
-  bootStrap(() => {
-    scanner().then((data) => { console.log(dB.all()); wrap() })
+function checkUserName(cb) {
+  let name;
 
-    function wrap() {
-    if(nick) executeCommand(`connect ${ip}`);
-    else {
-      fs.readFile('.userrc', (err, data) => {
-        if(!err) {
-          console.log('in setup', ip)
-          nick = JSON.parse(data.toString('utf8'))
-          executeCommand(`connect ${ip}`)
-        } else {
-          chooseUserName().then(name => {
-            nick = name
-            executeCommand(`connect ${ip}`)
-          })
+  fs.readFile('.userrc', (err, data) => {
+    if(err || !data) {
+      console.log('setting a nick name.. please reset it with tell -u <nick>')
+
+      let hash = Math.abs(hashCode(ips()[0]))
+      name = `user_${hash}`
+
+      fs.writeFile('.userrc', JSON.stringify(name), (err, data) => {
+        if(err) console.log('internal error occured, please try again or report author')
+        else {
+          console.log('Your nick name has been set to ', name)
+          cb(name)
         }
       })
+    } else {
+      cb(JSON.parse(data.toString('utf8')))
     }
-    }
+  })
+}
+
+function setUpConnect(ip) {
+  bootStrap(() => {
+    scanner().then((data) => {
+      if(nick) executeCommand(`connect ${ip}`);
+      else {
+        fs.readFile('.userrc', (err, data) => {
+          if(!err) {
+            nick = JSON.parse(data.toString('utf8'))
+            executeCommand(`connect ${ip}`)
+          } else {
+            chooseUserName().then(name => {
+              nick = name
+              executeCommand(`connect ${ip}`)
+            })
+          }
+        })
+      }
+    })
   })
 }
 
@@ -200,7 +205,7 @@ function init(_args) {
   // -u to set username
   // -c to connect to <ip/name>
   // -h for help
-  // 
+  //
   // Still couldn't decide the natural order of operations
   // so hardcoding in docs
   // options are selected based on the order of precedence
@@ -212,11 +217,14 @@ function init(_args) {
   // s
   // c
   // any combination of u and c , u comes first
-  
+
   function scan_or_connect(arg) {
-   if(arg.s) return scan()  
-   if(arg.c) return setUpConnect(arg.c)
-   process.exit()
+    if(arg.s) return scanAndShow().then(() => process.exit())
+    if(arg.c) return checkUserName((name) => {
+      nick = name
+      setUpConnect(arg.c)
+    })
+    process.exit()
   }
 
   if(_args.h) return executeCommand('rtfm')
@@ -227,6 +235,6 @@ function init(_args) {
   })
   else if(_args.s || _args.c) scan_or_connect(_args)
   else { console.log("invalid options"); process.exit(1) }
- }
+}
 
 init(require('minimist')(process.argv.slice(2)))
