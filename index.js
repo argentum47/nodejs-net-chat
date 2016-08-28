@@ -1,131 +1,126 @@
 'use strict'
 
-
 const dgram        = require('dgram')
 const EventEmitter = require('events')
-const fs           = require('fs')
-const os           = require('os')
+const net          = require('net')
 const rl           = require('readline').createInterface({ input: process.stdin, output: process.stdout })
-
-const broadCastIp = '192.168.1.255'
-//const broadCastIp = '0.0.0.0'
-const PORT        = 5000 
-const rcfile      = '.userrc'
+const Utils        = require('./utils')
+const Server       = require('./lib/server')
+const DHT          = require('./lib/dht')
+const broadCastIp  = '192.168.1.255'
+const PORT         = 5000
+const ips          = Utils.ips
 
 let nick
-let Utils = {
-  wrap: function(fn) {
-          let ctx = this;
-
-          return function() {
-            let args = Array.from(arguments)
-            
-            return new Promise((resolve, reject) => {
-              fn.apply(ctx, args.concat((err, result) => {
-                if(err) reject(err)
-                else resolve(result)
-              }))
-            })
-          }
-        },
-
-  hashCode: function(data) {
-              if(!data) return 0
-              if(typeof data !== 'string') data = data.toString()
-              
-              let hash = 0
-              for(let i =  0, len = data.length; i < len; i++) {
-                hash = data.charCodeAt(i) + ((hash << 17) - hash)
-                hash |= 0
-              }
-
-              return hash
-            }
-}
-
-let readFileAsync = Utils.wrap(fs.readFile)
-let writeFileAsync = Utils.wrap(fs.writeFile)
+let emitter = new EventEmitter()
+let nicks = {}
 
 rl.on('line', (data) => {
   if(isCommand(data)) {
   } else {
     console.log(data)
   }
+  rl.prompt(true)
 })
-
-function ips() {
-  let interfaces = os.networkInterfaces()
-
-  return Object.keys(interfaces).reduce((acc, k) => {
-    return acc.concat(interfaces[k].filter(i => i.family == 'IPv4' && !i.internal).map(i => i.address))
-  }, [])
-}
 
 function isCommand(data) {
   if(data.startsWith('/')) {
-    if(data == '/connect') {
-      // connect to server
+    let [command, nick, ...value] = data.split(' ')
+    value = value.join('')
+
+    if(command == '/msg') {
+      let client = dgram.createSocket('udp4')
+      client.on('message',(msg, rinfo) => {
+        try {
+          let data = JSON.parse(msg.toString('utf8'))
+          console.log(data)
+        } catch(e){
+          console.log(e)
+        }
+      })
+
+      let message = new Buffer(JSON.stringify(value))
+
+      if(net.isIP(nick)) {
+        client.send(message, 0, message.length, PORT, nick)
+      } else if(net.isIP(nicks[nick])) {
+        client.send(message, 0, message.length, PORT, clients.getNick(nick))
+      }
     }
   } else return false
 }
 
-// implement DHT for getting all users on network
+function setNicks(data) {
+  if(!data) return
 
-let clients = {
-  __data: {},
-  add: function(ip, nick) { this.__data[ip] = { ip: ip, nick: nick }  },
-  getNick: function(nick) { return Object.keys(this.__data).filter(k => this.__data[k] && this.__data[k].nick )[0] }
+  if(Array.isArray(data)) {
+    data.forEach(n => {
+      nicks[n.nick] = n.ip
+    })
+  } else if(data.nick && data.ip) {
+    nicks[data.nick] = data.ip
+  }
 }
 
-function getUserName(name) {
-  let ip = ips()[0]
-    
-  return readFileAsync(rcfile).then(data => {
-    nick = data.toString('utf8')
-  }).catch(()=> {
-    nick = `user_${Math.abs(Utils.hashCode(ip))}`
-    return writeFileAsync(rcfile, JSON.stringify(nick));
-  }).then(() => {
-    console.log('username set to ', nick)
-  }).catch(err => { console.log(err) })
-}
+Utils.getUserName().then((data) => {
+  nick = JSON.parse(data)
+  let server = new Server()
+  let broadCastServer = new Server()
 
-
-getUserName().then(() => {
-  let broadCastServer = dgram.createSocket('udp4')
-  let emitter = new EventEmitter()
-
-  broadCastServer.on('message', (msg, rinfo) => {
+  server.on('message', (data, rinfo) => {
     try {
-      let data = JSON.parse(msg.toString('utf8'))
-      if(data.type == 'nick') {
-        if(!ips().includes(rinfo.address)) clients.add(rinfo.address, data.nick)
+      if(data.type == 'clients') {
+        let clients = JSON.parse(data.data)
+        clients.forEach(c => {
+          DHT.create(Buffer.from(c.id), c.ip, c.port, c.nick)
+        })
+
+        setNicks(JSON.parse(DHT.serialize()).map(c => ({ nick: c.nick, ip: c.ip})))
       }
     } catch(e) {
-      console.log('error parsing your data ', data.toString('utf8'))
+      console.log(e)
+    }
+    rl.prompt(true)
+  })
+
+  server.bind(5000, () => {
+    console.log('server listening on 5000')
+    rl.prompt()
+  })
+
+  broadCastServer.on('message', (data, rinfo) => {
+    if(data.type == 'nick') {
+      nicks[data.nick] = rinfo.address
+      DHT.create(Utils.encrypt(rinfo.address), rinfo.address, PORT, nick)
+
+      let client = dgram.createSocket('udp4')
+      let message = new Buffer(JSON.stringify({ type: 'clients', data: DHT.serialize() }))
+
+      client.send(message, 0, message.length, PORT, rinfo.address, () => {
+        client.close()
+        client = null
+      })
     }
    rl.prompt(true)
   })
 
   broadCastServer.bind(5123, () => {
-    emitter.emit('broadcast::connect')
+    emitter.emit('broadcast::connect', nick)
   })
+}).catch(e => console.log(e))
 
-  emitter.on('broadcast::connect', () => {
-    function echoPresence() {
-      let broadCastClient = dgram.createSocket('udp4')
-      let message = new Buffer(JSON.stringify({nick: nick, type: 'nick'}))
-
-      broadCastClient.bind(PORT, () => {
-        broadCastClient.setBroadcast(true)
-        broadCastClient.send(message, 0, message.length, 5123, broadCastIp, () => {
-          broadCastClient.close()
-        })
-      })
-    }
-
-    echoPresence()
-    //setInterval(() => { echoPresence() }, 4000)
-  })
+emitter.on('broadcast::connect', (data) => {
+  echoPresence(data)
 })
 
+function echoPresence(name) {
+  let broadCastClient = dgram.createSocket('udp4')
+  let message = new Buffer(JSON.stringify({nick: name, type: 'nick'}))
+
+  broadCastClient.bind(5124, () => {
+    broadCastClient.setBroadcast(true)
+    broadCastClient.send(message, 0, message.length, 5123, broadCastIp, () => {
+      broadCastClient.close()
+    })
+  })
+}
