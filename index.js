@@ -1,27 +1,18 @@
 'use strict'
 
 const dgram        = require('dgram')
-const EventEmitter = require('events')
+const emitter      = require('./events')
 const net          = require('net')
-const rl           = require('readline').createInterface({ input: process.stdin, output: process.stdout })
 const Utils        = require('./utils')
 const Server       = require('./lib/server')
 const DHT          = require('./lib/dht')
+const createStore  = require('./store').createStore
 const broadCastIp  = '192.168.1.255'
 const PORT         = 5000
 const ips          = Utils.ips
 
 let nick
-let emitter = new EventEmitter()
-let nicks = {}
-
-rl.on('line', (data) => {
-  if(isCommand(data)) {
-  } else {
-    console.log(data)
-  }
-  rl.prompt(true)
-})
+let nicks = createStore({})
 
 function isCommand(data) {
   if(data.startsWith('/')) {
@@ -43,23 +34,11 @@ function isCommand(data) {
 
       if(net.isIP(nick)) {
         client.send(message, 0, message.length, PORT, nick)
-      } else if(net.isIP(nicks[nick])) {
+      } else if(net.isIP(nicks.get(nick))) {
         client.send(message, 0, message.length, PORT, clients.getNick(nick))
       }
     }
   } else return false
-}
-
-function setNicks(data) {
-  if(!data) return
-
-  if(Array.isArray(data)) {
-    data.forEach(n => {
-      nicks[n.nick] = n.ip
-    })
-  } else if(data.nick && data.ip) {
-    nicks[data.nick] = data.ip
-  }
 }
 
 Utils.getUserName().then((data) => {
@@ -75,22 +54,26 @@ Utils.getUserName().then((data) => {
           DHT.create(Buffer.from(c.id), c.ip, c.port, c.nick)
         })
 
-        setNicks(JSON.parse(DHT.serialize()).map(c => ({ nick: c.nick, ip: c.ip})))
+        nicks.action((nd) => {
+          JSON.parse(DHT.serialize()).forEach(c => nd[c.nick] = {ip: c.ip, owner: ips().includes(c.ip) })
+          return nd;
+        }, 'user::added')
       }
     } catch(e) {
       console.log(e)
     }
-    rl.prompt(true)
   })
 
   server.bind(5000, () => {
     console.log('server listening on 5000')
-    rl.prompt()
   })
 
   broadCastServer.on('message', (data, rinfo) => {
     if(data.type == 'nick') {
-      nicks[data.nick] = rinfo.address
+      nicks.action(nd => {
+        nd[data.nick] = { ip: rinfo.address, owner: ips().includes(rinfo.address) }
+        return nd
+      }, 'user::added')
       DHT.create(Utils.encrypt(rinfo.address), rinfo.address, PORT, nick)
 
       let client = dgram.createSocket('udp4')
@@ -101,7 +84,6 @@ Utils.getUserName().then((data) => {
         client = null
       })
     }
-   rl.prompt(true)
   })
 
   broadCastServer.bind(5123, () => {
@@ -110,6 +92,7 @@ Utils.getUserName().then((data) => {
 }).catch(e => console.log(e))
 
 emitter.on('broadcast::connect', (data) => {
+  console.log('connected to broadcast server')
   echoPresence(data)
 })
 

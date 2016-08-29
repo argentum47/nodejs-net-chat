@@ -1,0 +1,105 @@
+html, body, p, ul, li, div, span {
+  margin: 0;
+  padding: 0;
+}
+
+.clearfix::after {
+  content: " ";
+  height: 0;
+  visibility: hidden;
+  display: block;
+  clear: both;
+}
+
+.container__wrapper-content {
+  padding: 0 10px;
+  height: 80vh;
+  position: relative;
+}
+
+/* user list style */
+.container__wrapper-content__user-list {
+  background-color: #3a4856;
+  color: #fff;
+  width: 30%;
+  height: 100%;
+  float: left;
+}
+
+.container__wrapper-content__user-list ul {
+  list-style-type: none;
+}
+
+.container__wrapper-content__user-list li {
+  width: 100%;
+  padding: 10px 2px;
+  cursor: pointer;
+}
+
+.container__wrapper-content__user-list li a {
+  width: 100%
+}
+
+/* user list style end */
+
+/* chat box style */
+.container__wrapper-content__chat-wrapper {
+  width: 60%;
+  margin-left: 10px;
+  display: inline-block;
+}
+
+.container__wrapper-content__chat-wrapper__chat-box {
+  height: 100px;
+  padding-bottom: 20px
+  overflow-y: auto;
+}
+.container__wrapper-content__chat-box__input-container {
+  position: absolute;
+  bottom: 0;
+  padding: 10px;
+  background: #ccc;
+  width: 60%;
+}
+
+.container__wrapper-content__chat-box__input-container input {
+  width: 90%;
+}
+
+/* chat box style end */
+
+/* conversation text style */
+
+.conversation-text {
+  margin-bottom: 10px;
+}
+
+.conversation-text:last-child {
+  margin-bottom: 0;
+}
+
+.conversation-text__owner {
+  color: red;
+}
+
+.conversation-text:nth-child(even) span {
+  float: left;
+  width: 50px;
+  display: inline-block;
+}
+.conversation-text:nth-child(even) p {
+  float: left;
+  margin-left: 10px;
+}
+
+.conversation-text:nth-child(odd) span {
+  float: right;
+  width: 50px;
+  display: inline-block;
+}
+.conversation-text:nth-child(odd) p {
+  float: right;
+  margin-right: 10px;
+}
+
+/* conversation text style end */

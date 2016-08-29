@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <link rel="stylesheet" href="../css/index.css" type="text/css"/>
+  <title></title>
+</head>
+<body>
+  <main class="container">
+    <h2 class="text-center" id="chat-topic"></h2>
+    <div class="container__wrapper-content">
+      <ul class="container__wrapper-content__user-list"></ul>
+      <div class="container__wrapper-content__chat-wrapper">
+        <div class="container__wrapper-content__chat-wrapper__chat-box">
+        </div>
+        <div class="container__wrapper-content__chat-box__input-container">
+          <input type="text"></input>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <template id="conversation-template">
+    <div class="conversation-text clearfix">
+      <span class="conversation-text__owner"></span>
+      <p class="conversation-text__content"></p>
+    </div>
+  </template>
+  <template id="user-list-template">
+    <li data-id="">
+      <a class="user-info"></a>
+    </li>
+  </template>
+  <script src='../js/index.js'></script>
+</body>
+</html>
