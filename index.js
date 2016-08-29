@@ -7,13 +7,14 @@ const Utils        = require('./utils')
 const Server       = require('./lib/server')
 const DHT          = require('./lib/dht')
 const createStore  = require('./store').createStore
-const broadCastIp  = '192.168.1.255'
+const broadCastIp  = '192.168.43.255'
 const PORT         = 5000
 const ips          = Utils.ips
 
 let nick
-let nicks = createStore({})
+let nicks = createStore('nick')
 
+/*
 function isCommand(data) {
   if(data.startsWith('/')) {
     let [command, nick, ...value] = data.split(' ')
@@ -40,6 +41,7 @@ function isCommand(data) {
     }
   } else return false
 }
+*/
 
 Utils.getUserName().then((data) => {
   nick = JSON.parse(data)

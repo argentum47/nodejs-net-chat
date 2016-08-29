@@ -46,10 +46,9 @@ module.exports = {
     return readFileAsync(rcfile).then(data => {
       return data.toString('utf8')
     }).catch(()=> {
-      nick = `user_${Math.abs(this.hashCode(ip))}`
-      return writeFileAsync(rcfile, JSON.stringify(nick));
-    }).then(data => {
-      return data.toString('utf8')
+      let nick = `user_${Math.abs(this.hashCode(ip))}`
+      writeFileAsync(rcfile, JSON.stringify(nick));
+      return JSON.stringify(nick)
     })
   },
 

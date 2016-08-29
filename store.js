@@ -1,18 +1,32 @@
 'use strict';
+
 const emitter = require('./events')
-const createStore = (initialValue) => {
-  let obj = initialValue
+let store = {}
 
-  return {
-    action: function(reducer, event) {
-      obj = reducer(obj);
-      console.log(obj)
-      emitter.emit(event, obj)
-    },
-
-    get: (prop) => obj[prop]
-  }
+function Store(name) {
+  this._name = name
+  this._store = {}
 }
 
+Store.prototype.action = function (reducer, event) {
+  this._store = reducer(this._store)
+  setTimeout(() => {
+    emitter.emit(event, this._store)
+  }, 0)
+}
+
+Store.prototype.get = function (prop) {
+  return this._store[prop]
+}
+
+function createStore(name) {
+  let s = new Store(name)
+  store[name] = s
+  return s
+}
+
+function getStore(name) {
+  return store[name]
+}
+exports.getStore = getStore
 exports.createStore = createStore
-exports.emitter = emitter

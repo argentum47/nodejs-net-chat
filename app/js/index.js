@@ -1,6 +1,4 @@
 const remote = require('electron').remote
-//const emitter = require('../../store').emitter
-// this works, atleast fires event, but the data is old
 const emitter = remote.require('./events')
 
 const selectors = {
@@ -38,7 +36,7 @@ function createNewConversation(el, owner, content) {
   return document.importNode(el, true)
 }
 
-function setChatTopic(el, user_1, user_2) {
+function setChatTopic( user_1, user_2) {
   return `${user_1} - ${user_2}`
 }
 
@@ -53,7 +51,6 @@ emitter.on('user::added', function(data) {
   let frag = document.createDocumentFragment()
   nick = Object.keys(data).filter(k => data[k].owner)[0]
 
-  console.log(data)
   Object.keys(data).filter(k => !data[k].owner).forEach(name => {
     frag.appendChild(renderUser($(selectors.userListTemplate).content, name))
   })
