@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+scp -r app *.js lib package.json vox@192.168.1.151:/home/vox/dev/js/nodejs-net-chat

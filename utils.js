@@ -42,11 +42,14 @@ module.exports = {
   getUserName: function (name) {
     let ip = this.ips()[0]
     let [readFileAsync, writeFileAsync]  = [this.wrap(fs.readFile), this.wrap(fs.writeFile)]
+    let hashError = false
 
     return readFileAsync(rcfile).then(data => {
-      return data.toString('utf8')
+      if(name && name != data.toString('utf8')) {
+        throw new Error()
+      } else return data.toString('utf8')
     }).catch(()=> {
-      let nick = `user_${Math.abs(this.hashCode(ip))}`
+      let nick = name || `user_${Math.abs(this.hashCode(ip))}`
       writeFileAsync(rcfile, JSON.stringify(nick));
       return JSON.stringify(nick)
     })

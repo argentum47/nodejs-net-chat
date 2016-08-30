@@ -7,48 +7,15 @@ const Utils        = require('./utils')
 const Server       = require('./lib/server')
 const DHT          = require('./lib/dht')
 const createStore  = require('./store').createStore
-const broadCastIp  = '192.168.43.255'
+const broadCastIp  = '192.168.1.255'
 const PORT         = 5000
 const ips          = Utils.ips
 
 let nick
 let nicks = createStore('nick')
 
-/*
-function isCommand(data) {
-  if(data.startsWith('/')) {
-    let [command, nick, ...value] = data.split(' ')
-    value = value.join('')
-
-    if(command == '/msg') {
-      let client = dgram.createSocket('udp4')
-      client.on('message',(msg, rinfo) => {
-        try {
-          let data = JSON.parse(msg.toString('utf8'))
-          console.log(data)
-        } catch(e){
-          console.log(e)
-        }
-      })
-
-      let message = new Buffer(JSON.stringify(value))
-
-      if(net.isIP(nick)) {
-        client.send(message, 0, message.length, PORT, nick)
-      } else if(net.isIP(nicks.get(nick))) {
-        client.send(message, 0, message.length, PORT, clients.getNick(nick))
-      }
-    }
-  } else return false
-}
-*/
-
-Utils.getUserName().then((data) => {
-  nick = JSON.parse(data)
-  let server = new Server()
-  let broadCastServer = new Server()
-
-  server.on('message', (data, rinfo) => {
+function handleClientMessages(server) {
+   server.on('message', (data, rinfo) => {
     try {
       if(data.type == 'clients') {
         let clients = JSON.parse(data.data)
@@ -65,12 +32,10 @@ Utils.getUserName().then((data) => {
       console.log(e)
     }
   })
+}
 
-  server.bind(5000, () => {
-    console.log('server listening on 5000')
-  })
-
-  broadCastServer.on('message', (data, rinfo) => {
+function handleBroadCastMessages(server) {
+  server.on('message', (data, rinfo) => {
     if(data.type == 'nick') {
       nicks.action(nd => {
         nd[data.nick] = { ip: rinfo.address, owner: ips().includes(rinfo.address) }
@@ -87,25 +52,45 @@ Utils.getUserName().then((data) => {
       })
     }
   })
+}
 
-  broadCastServer.bind(5123, () => {
-    emitter.emit('broadcast::connect', nick)
-  })
-}).catch(e => console.log(e))
+function getUser(name) {
+  let server, broadCastServer;
 
-emitter.on('broadcast::connect', (data) => {
-  console.log('connected to broadcast server')
-  echoPresence(data)
-})
+  return Utils.getUserName(name).then((data) => {
+    nick = JSON.parse(data)
+    server = new Server()
+    broadCastServer = new Server()
+  }).then(() => {
+    handleClientMessages(server)
+    return new Promise(res => {
+      server.bind(PORT, res)
+    })
+  }).then(() => {
+    handleBroadCastMessages(broadCastServer)
+    return new Promise(res => {
+      broadCastServer.bind(5123, () => {
+        echoPresence(nick).then(res)
+      })
+    })
+  }).then(() => nick).catch(e => console.log(e))
+}
 
 function echoPresence(name) {
-  let broadCastClient = dgram.createSocket('udp4')
-  let message = new Buffer(JSON.stringify({nick: name, type: 'nick'}))
+  return new Promise((res) => {
+    let broadCastClient = dgram.createSocket('udp4')
+    let message = new Buffer(JSON.stringify({nick: name, type: 'nick'}))
 
-  broadCastClient.bind(5124, () => {
-    broadCastClient.setBroadcast(true)
-    broadCastClient.send(message, 0, message.length, 5123, broadCastIp, () => {
-      broadCastClient.close()
+    broadCastClient.bind(5124, () => {
+      broadCastClient.setBroadcast(true)
+      broadCastClient.send(message, 0, message.length, 5123, broadCastIp, () => {
+        broadCastClient.close()
+        res()
+      })
     })
   })
 }
+
+exports.getUser = getUser
+exports.handleClientMessages = handleClientMessages
+exports.handleBroadCastMessages = handleBroadCastMessages

@@ -7,16 +7,30 @@
 </head>
 <body>
   <main class="container">
-    <h2 class="text-center" id="chat-topic"></h2>
-    <div class="container__wrapper-content">
-      <ul class="container__wrapper-content__user-list"></ul>
-      <div class="container__wrapper-content__chat-wrapper">
-        <div class="container__wrapper-content__chat-wrapper__chat-box">
-        </div>
-        <div class="container__wrapper-content__chat-box__input-container">
-          <input type="text"></input>
+    <div class="pages" id="chat-window">
+      <h2 class="text-center" id="chat-topic"></h2>
+      <div class="container__wrapper-content">
+        <ul class="container__wrapper-content__user-list"></ul>
+        
+        <div class="container__wrapper-content__chat-wrapper">
+          <div class="container__wrapper-content__chat-wrapper__chat-box"></div>
+          <div class="container__wrapper-content__chat-box__input-container clearfix">
+            <textarea type="text" id="container__wrapper-content__input"></textarea>
+            <input type="submit" id="container__wrapper-content__submit" value="send"/>
+          </div>
         </div>
       </div>
+    </div>
+    <div id="user-name" class="pages show">
+      UserName <strong id="name"></strong>
+
+      <form class="form change-name-form">
+        <label for="change-name">Change</label>
+        <input type="text" id="change-name"/>
+        <input type="submit" value="Save"/>
+      </form>
+      <br/>
+      Or <a href="#chat-window">Proceed</a>
     </div>
   </main>
 

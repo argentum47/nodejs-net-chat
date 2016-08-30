@@ -10,9 +10,11 @@ function Store(name) {
 
 Store.prototype.action = function (reducer, event) {
   this._store = reducer(this._store)
+  console.log(this._store, 'haha')
+
   setTimeout(() => {
     emitter.emit(event, this._store)
-  }, 0)
+  }, 1000)
 }
 
 Store.prototype.get = function (prop) {

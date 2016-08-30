@@ -11,6 +11,14 @@ html, body, p, ul, li, div, span {
   clear: both;
 }
 
+.show {
+  display: block !important;
+}
+
+.pages {
+  display: none;
+}
+
 .container__wrapper-content {
   padding: 0 10px;
   height: 80vh;
