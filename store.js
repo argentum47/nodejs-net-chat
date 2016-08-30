@@ -8,17 +8,13 @@ function Store(name) {
   this._store = {}
 }
 
-Store.prototype.action = function (reducer, event) {
+Store.prototype.reduce = function (reducer) {
   this._store = reducer(this._store)
-  console.log(this._store, 'haha')
-
-  setTimeout(() => {
-    emitter.emit(event, this._store)
-  }, 1000)
+  return this
 }
 
 Store.prototype.get = function (prop) {
-  return this._store[prop]
+  return prop ? this._store[prop] : this._store
 }
 
 function createStore(name) {
