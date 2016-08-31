@@ -1,23 +1,17 @@
-const remote = require('electron').remote
+const remote      = require('electron').remote
+const jsesc       = require('jsesc')
 const ipcRenderer = require('electron').ipcRenderer
-const ips = remote.require('./utils').ips
-const main = remote.require('./main')
-const index = remote.require('./index')
+const ips         = remote.require('./utils').ips
+const main        = remote.require('./main')
+const index       = remote.require('./index')
 
 let isOwner = (ip) => ips().includes(ip)
-
-ipcRenderer.on('stuff', () => {
-  console.log('here')
-})
 
 ipcRenderer.on('update-nicks', (sender, data) => {
   let frag = document.createDocumentFragment()
   nick = Object.keys(data).filter(k => isOwner(data[k].ip))[0]
 
-  console.log(data);
-  Object.keys(data).forEach(k => {
-    console.log(data[k].ip, ips(), isOwner(data[k].ip))
-  });
+  //console.log(data);
 
   Object.keys(data).filter(k => !isOwner(data[k].ip)).forEach(name => {
     frag.appendChild(renderUser($(selectors.userListTemplate).content, name))
@@ -27,16 +21,14 @@ ipcRenderer.on('update-nicks', (sender, data) => {
   $(selectors.userList).appendChild(frag)
 })
 
-ipcRenderer.on('update-messages', (data) => {
-  let li;
-
-  if(e.target.tagName == 'A') li = e.target.closest('li')
-  else if(e.target.tagName == 'LI') li = e.target
-
-  if(li) {
-    to = li.dataset.id
-    $(selectors.topic).textContent = setChatTopic(nick, li.dataset.id)
+ipcRenderer.on('update-messages', (sender, data) => {
+  if(to !== data.from) {
+    to = data.from
+    $(selectors.topic).textContent = setChatTopic(nick, to)
   }
+
+  let el = createNewConversation($(selectors.conversationTemplate).content, data.from, jsesc(JSON.parse(data.text)))
+  $(selectors.chatWrapper).appendChild(el)
 })
 
 $(selectors.userList).addEventListener('click', (e) => {
@@ -57,15 +49,15 @@ $(selectors.submitButton).addEventListener('click', () => {
   if(!(value && to && nick)) return
 
   main.sendMessage(nick, to, value)
-  let el = createNewConversation($(selectors.conversationTemplate).content, nick, value)
-  console.log(el)
+
+  let el = createNewConversation($(selectors.conversationTemplate).content, nick, jsesc(value))
   $(selectors.chatWrapper).appendChild(el)
 })
 
 window.onload = function() {
   index.getUser().then(name => {
-    $(selectors.userName).textContent = name
-    nick = name
+    nick = jsesc(name)
+    $(selectors.userName).textContent = nick
   }).then(() => {
     return Promise.all([main.userServer(), main.broadCastServer(nick)])
   })
@@ -77,7 +69,7 @@ $(selectors.changeNameForm).addEventListener('submit', (e) => {
 
   if(value) {
     index.getUser(value).then(name => {
-      nick = name
+      nick = jsesc(name)
     }).then(() => {
       return Promise.all([main.userServer(), main.broadCastServer(nick)])
     }).then(() => {

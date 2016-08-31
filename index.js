@@ -17,18 +17,16 @@ function getUser(name) {
   }).then(() => nick).catch(e => console.log(e))
 }
 
-function createServer(PORT) {}
-
-function echoPresence(name) {
+function echoPresence(message) {
   return new Promise((res) => {
     let broadCastClient = dgram.createSocket('udp4')
-    let message = new Buffer(JSON.stringify({nick: name, type: 'nick'}))
+    message = new Buffer(JSON.stringify(message))
 
     broadCastClient.bind(5124, () => {
       console.log('broadcast client running on PORT ', 5124)
       broadCastClient.setBroadcast(true)
       broadCastClient.send(message, 0, message.length, 5123, broadCastIp, () => {
-        broadCastClient.close()
+        broadCastClient.close(() => { console.log('client shutdown') })
         res()
       })
     })
@@ -36,5 +34,4 @@ function echoPresence(name) {
 }
 
 exports.getUser = getUser
-exports.createServer = createServer
 exports.echoPresence = echoPresence

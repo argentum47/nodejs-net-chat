@@ -6,6 +6,7 @@ const dgram         = require('dgram');
 const index         = require('./index')
 const createStore   = require('./store').createStore
 const Utils         = require('./utils')
+const DFH           = require('./lib/dfh')
 const DHT           = require('./lib/dht')
 const Server        = require('./lib/server')
 const app           = electron.app
@@ -15,6 +16,7 @@ const BROPORT       = 5123
 
 let nicks      = createStore('nick')
 let mainWindow = null
+let server, bServer, nick
 
 function createWindow() {
  mainWindow = new BrowserWindow({
@@ -34,7 +36,11 @@ function createWindow() {
 }
 app.on('ready', createWindow)
 app.on('window-all-closed', () => {
- if(process.platform !== 'darwin') app.quit()
+  if(process.platform !== 'darwin') app.quit()
+})
+app.on('before-quit', () => {
+  if(server) server.close()
+  if(bServer) bServer.close()
 })
 
 function parseUserMessage(msg, rinfo) {
@@ -51,7 +57,7 @@ function parseUserMessage(msg, rinfo) {
       //console.log('sending', nicks.get())
       mainWindow.webContents.send('update-nicks', nicks.get())
     } else if(msg.type == 'message') {
-      mainWindow.webContents.send('update-messages', { nick: msg.from, data: msg.text })
+      mainWindow.webContents.send('update-messages', { from: msg.from, text: msg.text })
     }
   } catch(e) {
     console.log(e)
@@ -60,7 +66,7 @@ function parseUserMessage(msg, rinfo) {
 }
 
 function parseBroadcastMessage(msg, rinfo, nick) {
-  //console.log('parseBroadcastMessage', msg)
+  console.log('parseBroadcastMessage', msg)
   try {
     if(msg.type == 'nick') {
       nicks.reduce(n => {
@@ -78,6 +84,13 @@ function parseBroadcastMessage(msg, rinfo, nick) {
         client.close()
         client = null
       })
+    } else if(msg.type == 'leave') {
+      nicks.reduce(n => {
+        delete n[msg.nick]
+        return n
+      })
+
+      mainWindow.webContents.send('update-nicks', nicks.get())
     }
   } catch(e) {
     console.log(e)
@@ -85,24 +98,33 @@ function parseBroadcastMessage(msg, rinfo, nick) {
   }
 }
 
-exports.broadCastServer = function(nick) {
+exports.broadCastServer = function(name) {
+  nick = name
+
   return new Promise(res => {
-    let bServer = new Server()
+    bServer = new Server()
+
     bServer.on('message', (msg, rinfo) => parseBroadcastMessage(msg, rinfo, nick))
+
+    bServer.on('close', () => {
+      index.echoPresence({ nick: nick, type: 'leave' })
+    })
+
     bServer.bind(BROPORT, () => {
       console.log('broadcast server listening on PORT ', BROPORT)
-      index.echoPresence(nick).then(() => res())
+      index.echoPresence({nick: nick, type: 'nick'}).then(() => res()).catch(e => console.log(e))
     })
   })
 }
 
 exports.userServer = function() {
   return new Promise(res => {
-    let server = new Server()
+    server = new Server()
 
     server.on('message', (msg, info) => {
       parseUserMessage(msg, info)
     })
+
     server.bind(PORT, () => {
       console.log('user server listening on PORT ', PORT)
       res()
@@ -110,9 +132,11 @@ exports.userServer = function() {
   })
 }
 
-exports.sendMessage = function (from, to, value) {
-  let nicks = getStore('nick')
+exports.initiateExchange = function(from, to) {
 
+}
+
+exports.sendMessage = function (from, to, value) {
   if(nicks) {
     let client = dgram.createSocket('udp4')
     client.on('message', (msg, rinfo) => {
@@ -124,10 +148,11 @@ exports.sendMessage = function (from, to, value) {
       }
     })
 
-    let message = new Buffer(JSON.stringify({ type: 'message', text: JSON.stringify(value)}))
     let toIp = nicks.get(to)
+    let fromIp = nicks.get(from)
 
-    if(toIp && net.isIP(toIp.ip)) {
+    if(toIp && fromIp && net.isIP(toIp.ip), net.isIP(fromIp.ip)) {
+      let message = new Buffer(JSON.stringify({ type: 'message', from: from, text: JSON.stringify(value)}))
       client.send(message, 0, message.length, PORT, toIp.ip)
     }
   }
