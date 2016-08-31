@@ -38,8 +38,10 @@ $(selectors.userList).addEventListener('click', (e) => {
   else if(e.target.tagName == "LI") li = e.target
 
   if(li) {
-    to = li.dataset.id
-    $(selectors.topic).textContent = setChatTopic(nick, to)
+    main.initiateExchange(nick, to, () => {
+      to = li.dataset.id
+      $(selectors.topic).textContent = setChatTopic(nick, to)
+    })
   }
 })
 
