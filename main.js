@@ -42,7 +42,7 @@ function parseUserMessage(msg, rinfo) {
   try {
     if(msg.type == 'clients') {
       let clients = JSON.parse(msg.data)
-      console.log('user', rinfo.address, clients.map(c => c.ip + ' ' + c.nick))
+      //console.log('user', rinfo.address, clients.map(c => c.ip + ' ' + c.nick))
       clients.forEach(c => DHT.create(Buffer.from(c.id), c.ip, c.port, c.nick))
       nicks.reduce(n => {
         clients.forEach(c => n[c.nick] = { ip: c.ip })
@@ -64,12 +64,11 @@ function parseBroadcastMessage(msg, rinfo, nick) {
   try {
     if(msg.type == 'nick') {
       nicks.reduce(n => {
-        console.log(msg.nick, rinfo.address, 'bsm')
         n[msg.nick] = { ip: rinfo.address }
         return n
       })
 
-      DHT.create(Utils.encrypt(rinfo.address), rinfo.address, PORT, nick)
+      DHT.create(Utils.encrypt(rinfo.address), rinfo.address, PORT, msg.nick)
       mainWindow.webContents.send('update-nicks', nicks.get())
 
       let client = dgram.createSocket('udp4')
@@ -100,6 +99,7 @@ exports.broadCastServer = function(nick) {
 exports.userServer = function() {
   return new Promise(res => {
     let server = new Server()
+
     server.on('message', (msg, info) => {
       parseUserMessage(msg, info)
     })
