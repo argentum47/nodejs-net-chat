@@ -17,12 +17,7 @@ function getUser(name) {
   }).then(() => nick).catch(e => console.log(e))
 }
 
-function createServer(PORT) {
-  return new Promise(res => {
-    let server = new Server()
-    server.bind(PORT, () => res(server))
-  })
-}
+function createServer(PORT) {}
 
 function echoPresence(name) {
   return new Promise((res) => {
@@ -30,6 +25,7 @@ function echoPresence(name) {
     let message = new Buffer(JSON.stringify({nick: name, type: 'nick'}))
 
     broadCastClient.bind(5124, () => {
+      console.log('broadcast client running on PORT ', 5124)
       broadCastClient.setBroadcast(true)
       broadCastClient.send(message, 0, message.length, 5123, broadCastIp, () => {
         broadCastClient.close()
@@ -42,4 +38,3 @@ function echoPresence(name) {
 exports.getUser = getUser
 exports.createServer = createServer
 exports.echoPresence = echoPresence
-

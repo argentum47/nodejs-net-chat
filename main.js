@@ -3,12 +3,13 @@
 const electron      = require('electron')
 const net           = require('net')
 const dgram         = require('dgram');
-const app           = electron.app
-const BrowserWindow = electron.BrowserWindow
 const index         = require('./index')
 const createStore   = require('./store').createStore
 const Utils         = require('./utils')
 const DHT           = require('./lib/dht')
+const Server        = require('./lib/server')
+const app           = electron.app
+const BrowserWindow = electron.BrowserWindow
 const PORT          = 5000
 const BROPORT       = 5123
 
@@ -26,7 +27,7 @@ function createWindow() {
   mainWindow.on('close', () => {
     mainWindow = null
   })
-  mainWindow.webContents.once('did-finish-load', () => {  
+  mainWindow.webContents.once('did-finish-load', () => {
     mainWindow.webContents.send('stuff')
   })
 
@@ -37,16 +38,17 @@ app.on('window-all-closed', () => {
 })
 
 function parseUserMessage(msg, rinfo) {
+  //console.log('parseUserMessage', msg)
   try {
     if(msg.type == 'clients') {
       let clients = JSON.parse(msg.data)
-
+      console.log('user', rinfo.address, clients.map(c => c.ip + ' ' + c.nick))
       clients.forEach(c => DHT.create(Buffer.from(c.id), c.ip, c.port, c.nick))
       nicks.reduce(n => {
-        clients.forEach(c => n[c.nick] = { ip: c.ip, owner: Utils.ips().includes(c.ip) })
+        clients.forEach(c => n[c.nick] = { ip: c.ip })
         return n
       })
-
+      //console.log('sending', nicks.get())
       mainWindow.webContents.send('update-nicks', nicks.get())
     } else if(msg.type == 'message') {
       mainWindow.webContents.send('update-messages', { nick: msg.from, data: msg.text })
@@ -58,14 +60,18 @@ function parseUserMessage(msg, rinfo) {
 }
 
 function parseBroadcastMessage(msg, rinfo, nick) {
+  //console.log('parseBroadcastMessage', msg)
   try {
     if(msg.type == 'nick') {
       nicks.reduce(n => {
-        n[msg.nick] = { ip: rinfo.address, owner: Utils.ips().includes(rinfo.address) }
+        console.log(msg.nick, rinfo.address, 'bsm')
+        n[msg.nick] = { ip: rinfo.address }
         return n
       })
+
       DHT.create(Utils.encrypt(rinfo.address), rinfo.address, PORT, nick)
-      
+      mainWindow.webContents.send('update-nicks', nicks.get())
+
       let client = dgram.createSocket('udp4')
       let message = new Buffer(JSON.stringify({ type: 'clients', data: DHT.serialize() }))
 
@@ -81,20 +87,31 @@ function parseBroadcastMessage(msg, rinfo, nick) {
 }
 
 exports.broadCastServer = function(nick) {
-  index.createServer(BROPORT).then(bServer => {
+  return new Promise(res => {
+    let bServer = new Server()
     bServer.on('message', (msg, rinfo) => parseBroadcastMessage(msg, rinfo, nick))
-  }) 
+    bServer.bind(BROPORT, () => {
+      console.log('broadcast server listening on PORT ', BROPORT)
+      index.echoPresence(nick).then(() => res())
+    })
+  })
 }
 
 exports.userServer = function() {
-  index.createServer(PORT).then(server => {
-    server.on('message', parseUserMessage)
+  return new Promise(res => {
+    let server = new Server()
+    server.on('message', (msg, info) => {
+      parseUserMessage(msg, info)
+    })
+    server.bind(PORT, () => {
+      console.log('user server listening on PORT ', PORT)
+      res()
+    })
   })
 }
 
 exports.sendMessage = function (from, to, value) {
   let nicks = getStore('nick')
-  let PORT = 5000
 
   if(nicks) {
     let client = dgram.createSocket('udp4')
@@ -109,7 +126,7 @@ exports.sendMessage = function (from, to, value) {
 
     let message = new Buffer(JSON.stringify({ type: 'message', text: JSON.stringify(value)}))
     let toIp = nicks.get(to)
-    
+
     if(toIp && net.isIP(toIp.ip)) {
       client.send(message, 0, message.length, PORT, toIp.ip)
     }
