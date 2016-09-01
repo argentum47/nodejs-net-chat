@@ -53,24 +53,24 @@ function parseUserMessage(msg, rinfo) {
   try {
     if(msg.type == 'clients') {
       let clients = JSON.parse(msg.data)
-      //console.log('user', rinfo.address, clients.map(c => c.ip + ' ' + c.nick))
+
       clients.forEach(c => DHT.create(Buffer.from(c.id), c.ip, c.port, c.nick))
       nicks.reduce(n => {
         clients.forEach(c => n[c.nick] = { ip: c.ip })
         return n
       })
-      //console.log('sending', nicks.get())
+
       mainWindow.webContents.send('update-nicks', nicks.get())
     } else if(msg.type == 'message') {
       let decryptedMsg = vault.decrypt(msg.text, bob.computeSecret(alice_key).toString('hex'))
       mainWindow.webContents.send('update-messages', { from: msg.from, text: decryptedMsg })
     } else if(msg.type == 'keyxchange_alice') {
-      bob = new DeffMan(msg.prime, msg.generator)
-      alice_key = msg.alice_key
+      bob = new DeffMan(Buffer.from(msg.prime), Buffer.from(msg.generator))
+      alice_key = Buffer.from(msg.alice_key)
 
       sendClientMessage(JSON.stringify({ type: 'keyxchange_bob', bob_key: bob.getPublicKey() }), rinfo.address)
     } else if(msg.type == 'keyxchange_bob') {
-      bob_key = msg.bob_key
+      bob_key = Buffer.from(msg.bob_key)
     }
   } catch(e) {
     console.log(e)
@@ -79,16 +79,18 @@ function parseUserMessage(msg, rinfo) {
 }
 
 function sendClientMessage(message, address, cb) {
-    let client = dgram.createSocket('udp4')
-    client.send(message, 0, message.length, PORT, address, () => {
-        if(typeof cb === 'function') cb()
-        client.close()
-        client = null
-    })
+  let client = dgram.createSocket('udp4')
+  
+  client.send(message, 0, message.length, PORT, address, () => {
+    if(typeof cb === 'function') cb()
+  
+    client.close()
+    client = null
+  })
 }
 
 function parseBroadcastMessage(msg, rinfo, nick) {
-  console.log('parseBroadcastMessage', msg)
+  //console.log('parseBroadcastMessage', msg)
   try {
     if(msg.type == 'nick') {
       nicks.reduce(n => {
@@ -104,6 +106,16 @@ function parseBroadcastMessage(msg, rinfo, nick) {
     } else if(msg.type == 'leave') {
       nicks.reduce(n => {
         delete n[msg.nick]
+        return n
+      })
+
+      mainWindow.webContents.send('update-nicks', nicks.get())
+    } else if(msg.type == 'update_nick') {
+      nicks.reduce(n => {
+        let t = Object.assign({}, n[msg.from])
+        n[msg.newNick] = t
+        n[msg.from] = null
+        delete n[msg.from]
         return n
       })
 
@@ -152,10 +164,17 @@ exports.userServer = function() {
 exports.initiateExchange = function(from, to, cb) {
     alice = new DeffMan
     let toIp = nicks.get(to)
-    //let fromIp = nicks.get(from)
     let message = new Buffer(JSON.stringify({ type: 'keyxchange_alice', prime: alice.sharedPrime, generator: alice.generator, alice_key: alice.getPublicKey() }))
 
     if(toIp && toIp.ip) sendClientMessage(message, toIp.ip, cb)
+}
+
+exports.updateNick = function(nick, newNick) {
+  let fromIp = nicks.get(nick)
+
+  if(fromIp) {
+    index.echoPresence({ type: 'update_nick', from: nick, newNick: newNick })
+  }
 }
 
 exports.sendMessage = function (from, to, value) {
@@ -165,25 +184,8 @@ exports.sendMessage = function (from, to, value) {
 
       if(toIp && fromIp && net.isIP(toIp.ip), net.isIP(fromIp.ip)) {
           let text = vault.encrypt(value, alice.computeSecret(bob_key))
-          let message = new Buffer(JSON.stringify({ type: 'message', from: from, text: JSON.stringify(text)}))
-          sendClientMessage((message, 0, message.length, PORT, toIp.ip)
+          let message = JSON.stringify({ type: 'message', from: from, text: JSON.stringify(text)})
+          sendClientMessage(message, toIp.ip)
       }
-      /* let client = dgram.createSocket('udp4')
-       * client.on('message', (msg, rinfo) => {
-       *   try {
-       *     let data = JSON.parse(msg.toString('utf8'))
-       *     console.log(data)
-       *   } catch(e){
-       *     console.log(e)
-       *   }
-       * })
-
-       * let toIp = nicks.get(to)
-       * let fromIp = nicks.get(from)
-
-       * if(toIp && fromIp && net.isIP(toIp.ip), net.isIP(fromIp.ip)) {
-       *   let message = new Buffer(JSON.stringify({ type: 'message', from: from, text: JSON.stringify(value)}))
-       *   client.send(message, 0, message.length, PORT, toIp.ip)
-       * }*/
   }
 }

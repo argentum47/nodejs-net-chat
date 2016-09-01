@@ -36,10 +36,11 @@ $(selectors.userList).addEventListener('click', (e) => {
 
   if(e.target.tagName == "A") li = e.target.closest('li')
   else if(e.target.tagName == "LI") li = e.target
-
+      
+  to = li.dataset.id
+  
   if(li) {
     main.initiateExchange(nick, to, () => {
-      to = li.dataset.id
       $(selectors.topic).textContent = setChatTopic(nick, to)
     })
   }
@@ -49,7 +50,8 @@ $(selectors.submitButton).addEventListener('click', () => {
   let value = $(selectors.inputBox).value;
 
   if(!(value && to && nick)) return
-
+  
+  console.log(nick, to, "here")
   main.sendMessage(nick, to, value)
 
   let el = createNewConversation($(selectors.conversationTemplate).content, nick, jsesc(value))
@@ -71,9 +73,8 @@ $(selectors.changeNameForm).addEventListener('submit', (e) => {
 
   if(value) {
     index.getUser(value).then(name => {
+      main.updateNick(nick, name)
       nick = jsesc(name)
-    }).then(() => {
-      return Promise.all([main.userServer(), main.broadCastServer(nick)])
     }).then(() => {
       routeChange('#chat-window')
     })

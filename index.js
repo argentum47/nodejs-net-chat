@@ -35,3 +35,4 @@ function echoPresence(message) {
 
 exports.getUser = getUser
 exports.echoPresence = echoPresence
+
