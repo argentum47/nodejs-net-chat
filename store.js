@@ -17,6 +17,11 @@ Store.prototype.get = function (prop) {
   return prop ? this._store[prop] : this._store
 }
 
+Store.prototype.update = function(prop, value) {
+  if(typeof value === 'object' && this._store[prop]) this._store[prop] = Object.assign({}, this._store[prop], value)
+  return this
+}
+
 function createStore(name) {
   let s = new Store(name)
   store[name] = s

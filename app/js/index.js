@@ -48,14 +48,14 @@ $(selectors.userList).addEventListener('click', (e) => {
 
 $(selectors.submitButton).addEventListener('click', () => {
   let value = $(selectors.inputBox).value;
-
+  
   if(!(value && to && nick)) return
   
-  console.log(nick, to, "here")
-  main.sendMessage(nick, to, value)
+  main.sendMessage(nick, to, jsesc(value))
 
   let el = createNewConversation($(selectors.conversationTemplate).content, nick, jsesc(value))
   $(selectors.chatWrapper).appendChild(el)
+  $(selectors.inputBox).value = ''
 })
 
 window.onload = function() {
@@ -80,3 +80,4 @@ $(selectors.changeNameForm).addEventListener('submit', (e) => {
     })
   }
 })
+

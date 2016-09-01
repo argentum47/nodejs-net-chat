@@ -21,7 +21,7 @@ let server, bServer, nick
 
 // crypto objects named alice and bob
 // alice is initiator, bob is recipient
-let alice, bob, alice_key, bob_key
+// let alice, bob, alice_key, bob_key
 
 function createWindow() {
  mainWindow = new BrowserWindow({
@@ -62,15 +62,20 @@ function parseUserMessage(msg, rinfo) {
 
       mainWindow.webContents.send('update-nicks', nicks.get())
     } else if(msg.type == 'message') {
-      let decryptedMsg = vault.decrypt(msg.text, bob.computeSecret(alice_key).toString('hex'))
-      mainWindow.webContents.send('update-messages', { from: msg.from, text: decryptedMsg })
-    } else if(msg.type == 'keyxchange_alice') {
-      bob = new DeffMan(Buffer.from(msg.prime), Buffer.from(msg.generator))
-      alice_key = Buffer.from(msg.alice_key)
+      const from = nicks.get(msg.from)
+      const to   = nicks.get(nick)
 
-      sendClientMessage(JSON.stringify({ type: 'keyxchange_bob', bob_key: bob.getPublicKey() }), rinfo.address)
+      let decryptedMsg = vault.decrypt(msg.text, to.dfh.computeSecret(from.publicKey).toString('hex'))
+      mainWindow.webContents.send('update-messages', { from: msg.from, text: JSON.stringify(decryptedMsg) })
+    } else if(msg.type == 'keyxchange_alice') {
+      const bob = new DeffMan(Buffer.from(msg.prime), Buffer.from(msg.generator))
+      const bob_key = bob.getPublicKey()
+
+      nicks.update(msg.from, { publicKey: Buffer.from(msg.key) })
+      nicks.update(nick, { dfh: bob })
+      sendClientMessage(JSON.stringify({ type: 'keyxchange_bob', key: bob_key, to: nick }), rinfo.address)
     } else if(msg.type == 'keyxchange_bob') {
-      bob_key = Buffer.from(msg.bob_key)
+      nicks.update(msg.to, { publicKey: Buffer.from(msg.key) })
     }
   } catch(e) {
     console.log(e)
@@ -101,7 +106,7 @@ function parseBroadcastMessage(msg, rinfo, nick) {
       DHT.create(Utils.encrypt(rinfo.address), rinfo.address, PORT, msg.nick)
       mainWindow.webContents.send('update-nicks', nicks.get())
 
-      let message = new Buffer(JSON.stringify({ type: 'clients', data: DHT.serialize() }))
+      const message = new Buffer(JSON.stringify({ type: 'clients', data: DHT.serialize() }))
         sendClientMessage(message, rinfo.address)
     } else if(msg.type == 'leave') {
       nicks.reduce(n => {
@@ -162,11 +167,16 @@ exports.userServer = function() {
 }
 
 exports.initiateExchange = function(from, to, cb) {
-    alice = new DeffMan
-    let toIp = nicks.get(to)
-    let message = new Buffer(JSON.stringify({ type: 'keyxchange_alice', prime: alice.sharedPrime, generator: alice.generator, alice_key: alice.getPublicKey() }))
+  let alice = new DeffMan
 
-    if(toIp && toIp.ip) sendClientMessage(message, toIp.ip, cb)
+  const fromIp  = nicks.get(from)
+  const toIp    = nicks.get(to)
+  const key     = alice.getPublicKey()
+  const message = new Buffer(JSON.stringify({ type: 'keyxchange_alice', from: from, to: to, prime: alice.sharedPrime, generator: alice.generator, key: key }))
+
+  nicks.update(from, { dfh: alice })
+
+  if(toIp && net.isIP(toIp.ip)) sendClientMessage(message, toIp.ip, cb)
 }
 
 exports.updateNick = function(nick, newNick) {
@@ -177,15 +187,15 @@ exports.updateNick = function(nick, newNick) {
   }
 }
 
-exports.sendMessage = function (from, to, value) {
+exports.sendMessage = function (from_name, to_name, value) {
   if(nicks) {
-      let toIp = nicks.get(to)
-      let fromIp = nicks.get(from)
+      const to = nicks.get(to_name)
+      const from = nicks.get(from_name)
 
-      if(toIp && fromIp && net.isIP(toIp.ip), net.isIP(fromIp.ip)) {
-          let text = vault.encrypt(value, alice.computeSecret(bob_key))
-          let message = JSON.stringify({ type: 'message', from: from, text: JSON.stringify(text)})
-          sendClientMessage(message, toIp.ip)
+      if(to && from && net.isIP(to.ip), net.isIP(from.ip)) {
+        let text = vault.encrypt(value, from.dfh.computeSecret(to.publicKey).toString('hex'))
+        let message = JSON.stringify({ type: 'message', from: from_name, text: JSON.stringify(text)})
+        sendClientMessage(message, to.ip)
       }
   }
 }

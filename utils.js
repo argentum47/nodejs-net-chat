@@ -49,7 +49,8 @@ module.exports = {
         throw new Error()
       } else return data.toString('utf8')
     }).catch(()=> {
-      let nick = name || `user_${Math.abs(this.hashCode(ip))}`
+      let hash = Math.abs(this.hashCode(ip))
+      let nick = `${(name ? name : 'user')}_${hash}`
       writeFileAsync(rcfile, JSON.stringify(nick));
       return JSON.stringify(nick)
     })
