@@ -7,6 +7,7 @@ const selectors = {
   userInfo: '.user-info',
   topic: '#chat-topic',
   chatWrapper: '.container__wrapper-content__chat-wrapper__chat-box',
+  chatBoxInputWrapper: '.container__wrapper-content__chat-box__input-container',
   inputBox: '#container__wrapper-content__input',
   submitButton: '#container__wrapper-content__submit',
   userName: '#name',
@@ -15,7 +16,7 @@ const selectors = {
 }
 
 let rx = /<([^/>]+)\/?>$/,
-    nick, 
+    nick,
     to;
 
 
@@ -43,10 +44,6 @@ function routeChange(hash) {
   $(`.pages${hash}`).classList.add('show')
 }
 
-window.onhashchange = function() {
-  routeChange(window.location.hash ? window.location.hash : '#user-name')
-}
-
 
 /* stuff */
 function createNewConversation(el, owner, content) {
@@ -69,4 +66,3 @@ function renderUser(el, user_name) {
 
   return document.importNode(el, true)
 }
-

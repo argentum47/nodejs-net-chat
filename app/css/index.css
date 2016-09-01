@@ -63,6 +63,7 @@ html, body, p, ul, li, div, span {
   overflow-y: auto;
 }
 .container__wrapper-content__chat-box__input-container {
+  display: none;
   position: absolute;
   bottom: 0;
   padding: 10px;

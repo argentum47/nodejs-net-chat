@@ -39,9 +39,10 @@ $(selectors.userList).addEventListener('click', (e) => {
   if(e.target.tagName == "A") li = e.target.closest('li')
   else if(e.target.tagName == "LI") li = e.target
 
-  to = li.dataset.id
-
   if(li) {
+    $(selectors.chatBoxInputWrapper).classList.add('show')
+
+    to = li.dataset.id
     main.initiateExchange(nick, to, () => {
       $(selectors.topic).textContent = setChatTopic(nick, to)
     })
@@ -66,7 +67,14 @@ window.onload = function() {
     $(selectors.userName).textContent = nick
   }).then(() => {
     return Promise.all([main.userServer(), main.broadCastServer(nick)])
-  })
+  }).then(() => main.setUp())
+    .then(() => {
+      if(window.location.hash) routeChange(window.location.hash)
+    })
+}
+
+window.onhashchange = function() {
+  routeChange(window.location.hash ? window.location.hash : '#user-name')
 }
 
 $(selectors.changeNameForm).addEventListener('submit', (e) => {

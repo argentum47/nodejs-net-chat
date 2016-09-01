@@ -72,6 +72,7 @@ function parseUserMessage(msg, rinfo) {
       const to   = nicks.get(nick)
 
       let decryptedMsg = vault.decrypt(msg.text, to.dfh.computeSecret(from.publicKey).toString('hex'))
+
       mainWindow.webContents.send('update-messages', { from: msg.from, text: JSON.stringify(decryptedMsg), blurred: blurred })
     } else if(msg.type == 'keyxchange_alice') {
       const bob = new DeffMan(Buffer.from(msg.prime), Buffer.from(msg.generator))
@@ -141,6 +142,8 @@ function parseBroadcastMessage(msg, rinfo, nick) {
 exports.broadCastServer = function(name) {
   nick = name
 
+  if(bServer) return Promise.resolve(bServer)
+
   return new Promise(res => {
     bServer = new Server()
 
@@ -152,12 +155,19 @@ exports.broadCastServer = function(name) {
 
     bServer.bind(BROPORT, () => {
       console.log('broadcast server listening on PORT ', BROPORT)
-      index.echoPresence({nick: nick, type: 'nick'}).then(() => res()).catch(e => console.log(e))
+      res()
     })
   })
 }
 
+
+exports.setUp = function() {
+  return index.echoPresence({nick: nick, type: 'nick'}).catch(e => console.log(e))
+}
+
 exports.userServer = function() {
+  if(server) return Promise.resolve(server)
+
   return new Promise(res => {
     server = new Server()
 
