@@ -1,11 +1,14 @@
 'use strict'
 
-const dgram        = require('dgram')
-const emitter      = require('./events')
-const net          = require('net')
-const Utils        = require('./utils')
-const Server       = require('./lib/server')
-const broadCastIp  = '192.168.1.255'
+const dgram       = require('dgram')
+const emitter     = require('./events')
+const net         = require('net')
+const Utils       = require('./utils')
+const Server      = require('./lib/server')
+const appConfig   = require('./package.json').appConfig
+const clientPort  = Utils.normalizePort(appConfig.broadcastClientPort)
+const serverPort  = Utils.normalizePort(appConfig.broadcastServerPort)
+const broadCastIp = appConfig.broadcastIp
 
 let nick
 
@@ -22,10 +25,11 @@ function echoPresence(message) {
     let broadCastClient = dgram.createSocket('udp4')
     message = new Buffer(JSON.stringify(message))
 
-    broadCastClient.bind(5124, () => {
-      console.log('broadcast client running on PORT ', 5124)
+    broadCastClient.bind(clientPort, () => {
+      //console.log('broadcast client running on PORT ', 5124)
+
       broadCastClient.setBroadcast(true)
-      broadCastClient.send(message, 0, message.length, 5123, broadCastIp, () => {
+      broadCastClient.send(message, 0, message.length, serverPort, broadCastIp, () => {
         broadCastClient.close(() => { console.log('client shutdown') })
         res()
       })
@@ -35,4 +39,3 @@ function echoPresence(message) {
 
 exports.getUser = getUser
 exports.echoPresence = echoPresence
-

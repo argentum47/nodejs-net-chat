@@ -10,18 +10,15 @@ const DeffMan       = require('./lib/dfh')
 const DHT           = require('./lib/dht')
 const Server        = require('./lib/server')
 const vault         = require('./lib/vault')
+const appConfig     = require('./package.json').appConfig
 const app           = electron.app
 const BrowserWindow = electron.BrowserWindow
-const PORT          = 5000
-const BROPORT       = 5123
+const PORT          = Utils.normalizePort(appConfig.appPort)
+const BROPORT       = Utils.normalizePort(appConfig.broadcastServerPort)
 
 let nicks      = createStore('nick')
 let mainWindow = null
 let server, bServer, nick
-
-// crypto objects named alice and bob
-// alice is initiator, bob is recipient
-// let alice, bob, alice_key, bob_key
 
 function createWindow() {
  mainWindow = new BrowserWindow({
@@ -40,9 +37,11 @@ function createWindow() {
 
 }
 app.on('ready', createWindow)
+
 app.on('window-all-closed', () => {
   if(process.platform !== 'darwin') app.quit()
 })
+
 app.on('before-quit', () => {
   if(server) server.close()
   if(bServer) bServer.close()
@@ -85,10 +84,10 @@ function parseUserMessage(msg, rinfo) {
 
 function sendClientMessage(message, address, cb) {
   let client = dgram.createSocket('udp4')
-  
+
   client.send(message, 0, message.length, PORT, address, () => {
     if(typeof cb === 'function') cb()
-  
+
     client.close()
     client = null
   })

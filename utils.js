@@ -4,6 +4,12 @@ const crypto = require('crypto')
 const rcfile = '.userrc'
 
 module.exports = {
+  normalizePort: function(port) {
+    if(!port) throw new Error("da hell dude, provide a port")
+
+    return parseInt(port, 10)
+  },
+
   wrap: function(fn) {
     let ctx = this;
     return function() {

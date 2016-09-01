@@ -16,5 +16,11 @@
   },
   "dependencies": {
     "jsesc": "^2.2.0"
+  },
+  "appConfig": {
+    "broadcastIp": "192.168.1.255",
+    "broadcastServerPort": "5213",
+    "broadcastClientPort": "5124",
+    "appPort": "5000"
   }
 }
