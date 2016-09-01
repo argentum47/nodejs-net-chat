@@ -17,8 +17,7 @@ const PORT          = Utils.normalizePort(appConfig.appPort)
 const BROPORT       = Utils.normalizePort(appConfig.broadcastServerPort)
 
 let nicks      = createStore('nick')
-let mainWindow = null
-let server, bServer, nick
+let mainWindow = null, server, bServer, nick, blurred = false
 
 function createWindow() {
  mainWindow = new BrowserWindow({
@@ -31,10 +30,18 @@ function createWindow() {
   mainWindow.on('close', () => {
     mainWindow = null
   })
+
   mainWindow.webContents.once('did-finish-load', () => {
     mainWindow.webContents.send('stuff')
   })
 
+  mainWindow.on('blur', () => {
+    blurred = true
+  })
+
+  mainWindow.on('focus', () => {
+    blurred = false
+  })
 }
 app.on('ready', createWindow)
 
@@ -65,7 +72,7 @@ function parseUserMessage(msg, rinfo) {
       const to   = nicks.get(nick)
 
       let decryptedMsg = vault.decrypt(msg.text, to.dfh.computeSecret(from.publicKey).toString('hex'))
-      mainWindow.webContents.send('update-messages', { from: msg.from, text: JSON.stringify(decryptedMsg) })
+      mainWindow.webContents.send('update-messages', { from: msg.from, text: JSON.stringify(decryptedMsg), blurred: blurred })
     } else if(msg.type == 'keyxchange_alice') {
       const bob = new DeffMan(Buffer.from(msg.prime), Buffer.from(msg.generator))
       const bob_key = bob.getPublicKey()

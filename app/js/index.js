@@ -27,6 +27,8 @@ ipcRenderer.on('update-messages', (sender, data) => {
     $(selectors.topic).textContent = setChatTopic(nick, to)
   }
 
+  if(data.blurred) new Notification(`Message from ${data.from}`, { title: `Message from ${data.from}`, body: data.text })
+
   let el = createNewConversation($(selectors.conversationTemplate).content, data.from, jsesc(JSON.parse(data.text)))
   $(selectors.chatWrapper).appendChild(el)
 })
@@ -36,9 +38,9 @@ $(selectors.userList).addEventListener('click', (e) => {
 
   if(e.target.tagName == "A") li = e.target.closest('li')
   else if(e.target.tagName == "LI") li = e.target
-      
+
   to = li.dataset.id
-  
+
   if(li) {
     main.initiateExchange(nick, to, () => {
       $(selectors.topic).textContent = setChatTopic(nick, to)
@@ -48,9 +50,9 @@ $(selectors.userList).addEventListener('click', (e) => {
 
 $(selectors.submitButton).addEventListener('click', () => {
   let value = $(selectors.inputBox).value;
-  
+
   if(!(value && to && nick)) return
-  
+
   main.sendMessage(nick, to, jsesc(value))
 
   let el = createNewConversation($(selectors.conversationTemplate).content, nick, jsesc(value))
@@ -80,4 +82,3 @@ $(selectors.changeNameForm).addEventListener('submit', (e) => {
     })
   }
 })
-
