@@ -55,8 +55,9 @@ app.on('before-quit', () => {
 })
 
 function parseUserMessage(msg, rinfo) {
-  //console.log('parseUserMessage', msg)
   try {
+    msg = JSON.parse(msg)
+
     if(msg.type == 'clients') {
       let clients = JSON.parse(msg.data)
 
@@ -81,7 +82,9 @@ function parseUserMessage(msg, rinfo) {
       nicks.update(msg.from, { publicKey: Buffer.from(msg.key) })
       nicks.update(nick, { dfh: bob })
       sendClientMessage(JSON.stringify({ type: 'keyxchange_bob', key: bob_key, to: nick }), rinfo.address)
+      console.log("exchange", msg)
     } else if(msg.type == 'keyxchange_bob') {
+      console.log("bob", msg)
       nicks.update(msg.to, { publicKey: Buffer.from(msg.key) })
     }
   } catch(e) {
@@ -91,13 +94,17 @@ function parseUserMessage(msg, rinfo) {
 }
 
 function sendClientMessage(message, address, cb) {
-  let client = dgram.createSocket('udp4')
+  let buff = Buffer.alloc(4)
+  let hex = message.length.toString(16)
 
-  client.send(message, 0, message.length, PORT, address, () => {
-    if(typeof cb === 'function') cb()
+  console.log('length', message.length);
 
-    client.close()
-    client = null
+  let client = net.connect({ port: PORT, host: address }, () => {
+   if(hex.length % 2 !== 0) hex = '0' + hex
+    buff.writeUIntBE(`0x${hex}`, 0, 4)
+
+    client.write(buff)
+    client.write(Buffer.from(message, 'utf8'))
   })
 }
 
@@ -113,8 +120,8 @@ function parseBroadcastMessage(msg, rinfo, nick) {
       DHT.create(Utils.encrypt(rinfo.address), rinfo.address, PORT, msg.nick)
       mainWindow.webContents.send('update-nicks', nicks.get())
 
-      const message = new Buffer(JSON.stringify({ type: 'clients', data: DHT.serialize() }))
-        sendClientMessage(message, rinfo.address)
+      const message = JSON.stringify({ type: 'clients', data: DHT.serialize() })
+      sendClientMessage(message, rinfo.address)
     } else if(msg.type == 'leave') {
       nicks.reduce(n => {
         delete n[msg.nick]
@@ -169,13 +176,36 @@ exports.userServer = function() {
   if(server) return Promise.resolve(server)
 
   return new Promise(res => {
-    server = new Server()
+    let len;
+    let buff = Buffer.from('');
+    let address;
 
-    server.on('message', (msg, info) => {
-      parseUserMessage(msg, info)
-    })
+    server = net.createServer(sock => {
+      sock.on('data', (data) => {
+        address = sock.remoteAddress == '::ffff:127.0.0.1' ? Utils.ips()[0] : sock.remoteAddress
 
-    server.bind(PORT, () => {
+        console.log(data.toString('utf8'))
+
+        if(!len) {
+          len = data.readUIntBE(0, 4)
+          console.log(len)
+          buff = Buffer.from(data.slice(4))
+        }
+
+        if(buff.length + data.length >= len) {
+          let diff = len - buff.length
+
+          buff = Buffer.concat([buff, data.slice(0, diff)])
+          parseUserMessage(buff.toString('utf8'), { address: address })
+
+          if(data.slice(diff).length >= 4) len = data.slice(diff).readUIntBE(0, 4)
+          else len = 0
+          buff = Buffer.from(data.slice(diff + 4))
+        } else {
+          buff = Buffer.concat([buff, data])
+        }
+      })
+    }).listen(PORT, () => {
       console.log('user server listening on PORT ', PORT)
       res()
     })
@@ -188,7 +218,7 @@ exports.initiateExchange = function(from, to, cb) {
   const fromIp  = nicks.get(from)
   const toIp    = nicks.get(to)
   const key     = alice.getPublicKey()
-  const message = new Buffer(JSON.stringify({ type: 'keyxchange_alice', from: from, to: to, prime: alice.sharedPrime, generator: alice.generator, key: key }))
+  const message = JSON.stringify({ type: 'keyxchange_alice', from: from, to: to, prime: alice.sharedPrime, generator: alice.generator, key: key })
 
   nicks.update(from, { dfh: alice })
 
