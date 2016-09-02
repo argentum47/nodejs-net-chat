@@ -82,9 +82,7 @@ function parseUserMessage(msg, rinfo) {
       nicks.update(msg.from, { publicKey: Buffer.from(msg.key) })
       nicks.update(nick, { dfh: bob })
       sendClientMessage(JSON.stringify({ type: 'keyxchange_bob', key: bob_key, to: nick }), rinfo.address)
-      console.log("exchange", msg)
     } else if(msg.type == 'keyxchange_bob') {
-      console.log("bob", msg)
       nicks.update(msg.to, { publicKey: Buffer.from(msg.key) })
     }
   } catch(e) {
@@ -96,8 +94,6 @@ function parseUserMessage(msg, rinfo) {
 function sendClientMessage(message, address, cb) {
   let buff = Buffer.alloc(4)
   let hex = message.length.toString(16)
-
-  console.log('length', message.length);
 
   let client = net.connect({ port: PORT, host: address }, () => {
    if(hex.length % 2 !== 0) hex = '0' + hex
@@ -184,25 +180,17 @@ exports.userServer = function() {
       sock.on('data', (data) => {
         address = sock.remoteAddress == '::ffff:127.0.0.1' ? Utils.ips()[0] : sock.remoteAddress
 
-        console.log(data.toString('utf8'))
+        buff = Buffer.concat([buff, data])
 
         if(!len) {
-          len = data.readUIntBE(0, 4)
-          console.log(len)
-          buff = Buffer.from(data.slice(4))
+          len = buff.readUIntBE(0, 4)
+          buff = buff.slice(4)
         }
 
-        if(buff.length + data.length >= len) {
-          let diff = len - buff.length
-
-          buff = Buffer.concat([buff, data.slice(0, diff)])
-          parseUserMessage(buff.toString('utf8'), { address: address })
-
-          if(data.slice(diff).length >= 4) len = data.slice(diff).readUIntBE(0, 4)
-          else len = 0
-          buff = Buffer.from(data.slice(diff + 4))
-        } else {
-          buff = Buffer.concat([buff, data])
+        if(buff.length >= len) {
+          parseUserMessage(buff.slice(0, len), { address: address })
+          buff = Buffer.from(buff.slice(len, buff.length))
+          len = 0
         }
       })
     }).listen(PORT, () => {
